@@ -30,7 +30,6 @@ config/settings.json
 # AWS local credentials/config if copied into the project
 .aws/
 credentials
-config
 
 # ==============================
 # macOS
