@@ -1,0 +1,62 @@
+{
+  "dataset": "NEXA Retail Sales",
+  "database": "nexa_master",
+  "allowed_view": "vw_nexa_genbi_sales",
+  "grain": "One row represents one product line belonging to a completed order.",
+  "business_context": {
+    "currency": "PEN",
+    "currency_symbol": "S/",
+    "locale": "es-PE"
+  },
+  "dimensions": {
+    "sale_date": {
+      "column": "sale_date",
+      "label": "Sale Date"
+    },
+    "category": {
+      "column": "category",
+      "label": "Product Category"
+    },
+    "sales_channel": {
+      "column": "sales_channel",
+      "label": "Sales Channel"
+    }
+  },
+  "measures": {
+    "revenue": {
+      "label": "Revenue",
+      "sql": "SUM(revenue)",
+      "synonyms": [
+        "ventas",
+        "venta",
+        "vendimos",
+        "ventas totales",
+        "ingresos",
+        "sales",
+        "facturacion"
+      ]
+    },
+    "units_sold": {
+      "label": "Units Sold",
+      "sql": "SUM(quantity)",
+      "synonyms": [
+        "unidades vendidas",
+        "unidades",
+        "items sold"
+      ]
+    }
+  },
+  "business_rules": [
+    "This is a template, NOT an approved semantic layer. Review the AI draft with business stakeholders and complete the definitions.",
+    "Orders must count DISTINCT order_id because each row is an order line.",
+    "When the user says ventas without further qualification, use Revenue."
+  ],
+  "ambiguities": {
+    "ventas": {
+      "approved_default": "revenue",
+      "alternatives": [
+        "units_sold"
+      ]
+    }
+  }
+}
