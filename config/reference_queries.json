@@ -1,0 +1,26 @@
+[
+  {
+    "id": "GQ01",
+    "question": "cuanto vendimos en total?",
+    "metric": "revenue",
+    "reference_sql": "SELECT SUM(revenue) AS revenue FROM vw_nexa_genbi_sales"
+  },
+  {
+    "id": "GQ02",
+    "question": "cuantos pedidos tuvimos?",
+    "metric": "orders",
+    "reference_sql": "SELECT COUNT(DISTINCT order_id) AS orders FROM vw_nexa_genbi_sales"
+  },
+  {
+    "id": "GQ03",
+    "question": "cual fue el ticket promedio?",
+    "metric": "average_order_value",
+    "reference_sql": "SELECT SUM(revenue) / NULLIF(COUNT(DISTINCT order_id), 0) AS average_order_value FROM vw_nexa_genbi_sales"
+  },
+  {
+    "id": "GQ04",
+    "question": "cual fue el margen total?",
+    "metric": "margin",
+    "reference_sql": "SELECT SUM(margin) AS margin FROM vw_nexa_genbi_sales"
+  }
+]
