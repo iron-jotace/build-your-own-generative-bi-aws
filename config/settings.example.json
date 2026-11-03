@@ -1,0 +1,8 @@
+{
+  "aws_region": "eu-west-1",
+  "athena_database": "nexa_master",
+  "allowed_view": "vw_nexa_genbi_sales",
+  "athena_output_s3": "s3://REPLACE-WITH-YOUR-BUCKET/athena-results/",
+  "athena_workgroup": "primary",
+  "bedrock_model_id": "eu.amazon.nova-micro-v1:0"
+}
