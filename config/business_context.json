@@ -1,0 +1,6 @@
+{
+  "dataset_name": "NEXA Retail Sales",
+  "business_domain": "Retail",
+  "grain": "One row represents one product line belonging to a completed order.",
+  "known_business_notes": []
+}
