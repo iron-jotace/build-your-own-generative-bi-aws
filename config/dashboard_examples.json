@@ -1,0 +1,9 @@
+{
+  "title": "NEXA Retail | Executive Overview",
+  "components": [
+    {"id": "sales", "type": "kpi", "metric": "revenue", "title": "Ventas totales"},
+    {"id": "units", "type": "kpi", "metric": "units_sold", "title": "Unidades vendidas"},
+    {"id": "categories", "type": "bar", "metric": "revenue", "dimension": "category", "title": "Ventas por categoría"},
+    {"id": "channels", "type": "table", "metric": "revenue", "dimension": "sales_channel", "title": "Ventas por canal"}
+  ]
+}
