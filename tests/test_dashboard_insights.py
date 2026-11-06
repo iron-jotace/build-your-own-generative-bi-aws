@@ -46,5 +46,22 @@ class InsightTests(unittest.TestCase):
         ], SEMANTIC)
         self.assertEqual(evidence, [])
 
+
+    def test_share_only_when_groups_reconcile(self):
+        rows = [
+            entry("ventas", "revenue", "kpi", [{"metric_value": 100}]),
+            entry("category", "revenue", "bar", [
+                {"dimension_value": "Fashion", "metric_value": 60},
+                {"dimension_value": "Sports", "metric_value": 40},
+            ], "category"),
+        ]
+        evidence = evidence_from_results(rows, SEMANTIC)
+        self.assertIn("60.0%", evidence[1]["fact"])
+        rows[1] = entry("category", "revenue", "bar", [
+            {"dimension_value": "Fashion", "metric_value": 60}
+        ], "category")
+        evidence = evidence_from_results(rows, SEMANTIC)
+        self.assertNotIn("%", evidence[1]["fact"])
+
 if __name__ == "__main__":
     unittest.main()
