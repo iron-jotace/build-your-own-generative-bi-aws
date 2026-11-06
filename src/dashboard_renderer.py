@@ -18,7 +18,8 @@ def _format_value(value, metric, semantic):
 
 def render_component(result, semantic, show_details=False):
     component = result["component"]
-    st.markdown(f"**{component['title']}**")
+    if component["type"] != "kpi":
+        st.markdown(f"**{component['title']}**")
     if result["error"]:
         st.error(f"No se pudo ejecutar: {result['error']}")
         return
