@@ -9,6 +9,7 @@ from src.dashboard_planner import plan_dashboard
 from src.dashboard_runtime import execute_dashboard
 from src.dashboard_renderer import render_dashboard
 from src.dashboard_validator import validate_dashboard
+from src.dashboard_insights import evidence_from_results, curate_insights
 
 st.set_page_config(page_title="NEXA | Build Dashboard", page_icon="📈", layout="wide")
 st.title("📈 NEXA Retail — Build Dashboard")
@@ -28,6 +29,7 @@ if "dashboard_spec_text" not in st.session_state:
 
 mode = st.radio("Modo de construcción", ["✨ Prompt-to-Dashboard (Bedrock)", "🧩 JSON manual"], horizontal=True)
 details = st.checkbox("Mostrar SQL y metadatos Athena", value=False)
+include_insights = st.checkbox("Executive Insights (selección con Bedrock)", value=True)
 preset = st.selectbox("Ejemplo preparado", ["Comercial (4 componentes)", "Ejecutivo (7 componentes)"])
 if st.button("📋 Cargar ejemplo en JSON"):
     selected = executive_spec if preset.startswith("Ejecutivo") else default_spec
@@ -85,5 +87,30 @@ if st.button("🚀 Construir dashboard", type="primary"):
         st.stop()
 
     render_dashboard(final_spec, results, semantic, show_details=details)
+
+    evidence = evidence_from_results(results, semantic)
+    if evidence:
+        st.divider()
+        st.subheader("💡 Executive Insights")
+        st.caption("Datos calculados en Athena; Bedrock solo prioriza hechos verificados.")
+        selected = evidence[:4]
+        if include_insights:
+            try:
+                with st.spinner("Seleccionando hallazgos verificados..."):
+                    client = BedrockClient(
+                        region=settings["aws_region"],
+                        model_id=settings["bedrock_model_id"],
+                    )
+                    selected = curate_insights(
+                        client,
+                        prompt if mode.startswith("✨") else final_spec["title"],
+                        evidence,
+                    )
+            except Exception as exc:
+                st.warning(f"Bedrock no pudo priorizar los hechos; se muestra el resumen determinista: {exc}")
+        for item in selected:
+            st.markdown(f"- **{item['title']}** — {item['fact']}")
+        st.caption("Los resultados no demuestran causalidad; verifica la cobertura temporal de los datos.")
+
     if any(item["error"] for item in results):
         st.warning("Dashboard parcial: algunas consultas no pudieron ejecutarse.")
