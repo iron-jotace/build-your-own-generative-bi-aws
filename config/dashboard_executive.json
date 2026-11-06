@@ -1,0 +1,12 @@
+{
+  "title": "NEXA Retail | Executive Performance",
+  "components": [
+    {"id": "revenue_total", "type": "kpi", "metric": "revenue", "title": "Ventas totales"},
+    {"id": "orders_total", "type": "kpi", "metric": "orders", "title": "Pedidos"},
+    {"id": "average_ticket", "type": "kpi", "metric": "average_order_value", "title": "Ticket promedio"},
+    {"id": "margin_total", "type": "kpi", "metric": "margin", "title": "Margen total"},
+    {"id": "revenue_monthly", "type": "line", "metric": "revenue", "dimension": "sale_month", "limit": 100, "title": "Evolución mensual de ventas"},
+    {"id": "revenue_category", "type": "bar", "metric": "revenue", "dimension": "category", "title": "Ventas por categoría"},
+    {"id": "revenue_channel", "type": "bar", "metric": "revenue", "dimension": "sales_channel", "title": "Ventas por canal"}
+  ]
+}
