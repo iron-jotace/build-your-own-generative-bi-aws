@@ -23,7 +23,7 @@ def _amount(value, metric, semantic):
     if metric in {"revenue", "margin", "cost", "gross_sales", "average_order_value"}:
         return f"{symbol}{value:,.2f}"
     if metric == "margin_pct":
-        return f"{value:,.2f}" + ("% " if abs(value) > 1 else " (ratio)")
+        return f"{value * 100:,.2f}%"
     return f"{value:,.2f}"
 
 
