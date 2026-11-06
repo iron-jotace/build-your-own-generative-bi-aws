@@ -136,4 +136,13 @@ def curate_insights(bedrock_client, business_request, evidence):
         if key not in seen:
             final.append(indexed[key])
             seen.add(key)
+    # A governed summary should not consist exclusively of KPI repeats when
+    # valid categorical or temporal comparisons are available.
+    breakdown = [item for item in evidence if item["fact"].startswith(("Lidera ", "El mayor valor mensual"))]
+    if breakdown and not any(item["id"] in {x["id"] for x in breakdown} for item in final):
+        chosen = breakdown[0]
+        if len(final) == 4:
+            final[-1] = chosen
+        else:
+            final.append(chosen)
     return final
