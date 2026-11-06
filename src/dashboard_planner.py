@@ -27,6 +27,8 @@ REGLAS:
 - Para categorías y canales usa category y sales_channel respectivamente, si están disponibles.
 - Omite métricas no autorizadas; nunca sustituyas una métrica ausente por otra incongruente.
 - Diseña el dashboard para responder específicamente a la petición del usuario.
+- No dupliques la MISMA métrica y dimensión en dos gráficos: una serie revenue por sale_month reemplaza una tabla revenue por sale_month.
+- Si hay espacio, prioriza diversidad de categorías, canales, rentabilidad y clientes cuando se soliciten.
 """
 
 
@@ -52,6 +54,24 @@ def catalog_for_planner(semantic):
     }
 
 
+def remove_redundant_components(spec):
+    """Keep one visualization per metric+dimension, preferring time lines and charts.
+
+    This runs AFTER strict schema/semantic validation; unapproved or unsafe
+    components can never be silently repaired.
+    """
+    preference = {"line": 3, "bar": 2, "table": 1, "kpi": 1}
+    selected = {}
+    for index, component in enumerate(spec["components"]):
+        identity = (component["metric"], component["dimension"])
+        old = selected.get(identity)
+        if old is None or preference[component["type"]] > preference[old[1]["type"]]:
+            selected[identity] = (index, component)
+    output = dict(spec)
+    output["components"] = [item[1] for item in sorted(selected.values(), key=lambda item: item[0])]
+    return output
+
+
 def plan_dashboard(bedrock_client, user_request, semantic):
     if not isinstance(user_request, str) or not 5 <= len(user_request.strip()) <= 1500:
         raise ValueError("Escribe una petición de negocio de 5 a 1500 caracteres.")
@@ -70,4 +90,5 @@ def plan_dashboard(bedrock_client, user_request, semantic):
         user_prompt=request,
         max_tokens=2800,
     )
-    return validate_dashboard(proposed, semantic, max_components=8)
+    validated = validate_dashboard(proposed, semantic, max_components=8)
+    return remove_redundant_components(validated)
