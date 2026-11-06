@@ -234,3 +234,100 @@ Cada grupo adapta el patrón a su **propio Data Mart** y entrega:
 El alumno puede demostrar: **un prompt**, un **JSON auditable**, métricas de Semantic Layer, SQL validado, resultados reales de Athena, **dashboard diferente al cambiar la intención**, insights sin alucinaciones y una prueba negativa.
 
 > **Bedrock interpreta. La Semantic Layer gobierna. Athena calcula. Streamlit presenta.**
+
+---
+
+## Anexo A — Guía de navegación por la consola AWS (Irlanda)
+
+El alumno debe seleccionar **Europe (Ireland), eu-west-1** en la esquina superior de la consola AWS.
+
+1. En **S3 → Buckets** localizar el bucket del hands-on y la ruta de resultados de Athena que figura en el \`athena_output_s3\` de \`config/settings.json\`.
+2. En **AWS Glue → Data Catalog → Databases** localizar \`nexa_master\` y las tablas del Data Mart creadas en clases anteriores.
+3. En **Amazon Athena → Query editor**, usar la base \`nexa_master\` y comprobar que existe \`vw_nexa_genbi_sales\`. Si falta, consultar \`sql/01_create_genbi_view.sql\` de la práctica previa, sin ejecutar cambios no autorizados.
+4. En **Athena → Workgroups** comprobar que el Workgroup de \`athena_workgroup\` está disponible y que la salida de resultados está bien configurada.
+5. En **Amazon Bedrock**, verificar acceso y permiso de invocación del modelo o perfil configurado en \`bedrock_model_id\` para \`eu-west-1\`.
+
+Verificaciones desde terminal:
+
+\`\`\`bash
+aws sts get-caller-identity
+aws configure get region
+python -c "from src.config import load_json; s=load_json('config/semantic_layer.json'); print('METRICAS:',list(s.get('measures',{}))); print('DIMENSIONES:',list(s.get('dimensions',{})))"
+\`\`\`
+
+El comando \`aws configure get region\` puede diferir de la región usada por boto3: la aplicación toma \`aws_region\` de \`config/settings.json\`.
+
+## Anexo B — Windows PowerShell (alternativa a macOS/Conda)
+
+\`\`\`powershell
+git clone https://github.com/iron-jotace/build-your-own-generative-bi-aws.git
+cd build-your-own-generative-bi-aws
+git fetch origin
+git switch feature/prompt-to-dashboard
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m unittest discover -s tests -v
+python -m streamlit run app.py
+\`\`\`
+
+También puedes usar Anaconda Prompt con \`conda create -n nexa-dashboard python=3.11 -y\` y \`conda activate nexa-dashboard\`, como en el laboratorio del docente. Si PowerShell prohíbe la activación, usa una terminal permitida por la administración de tu equipo; no cambies políticas de seguridad sin autorización.
+
+Copia \`config/settings.example.json\` como \`config/settings.json\` con \`Copy-Item\`. **No confundas** la Semantic Layer de ejemplo con \`config/semantic_layer.json\`: esta última proviene de la validación humana de la práctica previa y no está versionada en GitHub.
+
+## Anexo C — Lectura guiada del contrato y del código
+
+Un dashboard puede contener hasta ocho componentes planificados por Bedrock. Los siguientes campos de cada componente son esenciales:
+
+| Campo | Ejemplo | Regla |
+|---|---|---|
+| \`id\` | \`sales_by_category\` | Identificador único, minúsculas y guiones bajos |
+| \`type\` | \`kpi\`, \`bar\`, \`line\`, \`table\` | Tipo permitido; \`line\` solo para fechas |
+| \`metric\` | \`revenue\` | Debe existir en \`measures\` de Semantic Layer aprobada |
+| \`dimension\` | \`category\` o \`null\` | KPI sin dimensión; barras/líneas/tablas con dimensión aprobada |
+| \`limit\` | \`20\` | Entero entre 1 y 100 |
+| \`title\` | \`Ventas por categoría\` | Etiqueta para la interfaz |
+
+**Flujo a revisar en el código:**
+
+- \`src/dashboard_planner.py\` envía el catálogo aprobado a Bedrock, valida su JSON, permite un único reintento por error de validación y elimina duplicados exactos \`metric + dimension\`.
+- \`src/dashboard_validator.py\` comprueba esquema y combinaciones. Expone \`sale_month\` solo como dimensión virtual derivada de \`sale_date\` aprobada.
+- \`src/dashboard_sql_builder.py\` compila \`SELECT\` desde expresiones locales, nunca acepta SQL arbitrario como campo del JSON de Bedrock.
+- \`src/dashboard_runtime.py\` aplica el SQL Guard y consulta Athena para cada componente.
+- \`src/dashboard_renderer.py\` dibuja KPI, barras horizontales, líneas temporales y tablas sin cambiar código para cada intención.
+- \`src/dashboard_insights.py\` convierte resultados reales de Athena en evidencias; Bedrock únicamente selecciona sus IDs. Si el selector falla, se muestra un resumen determinista.
+
+**No confundir un error del Planner con un fallo de Athena:** en modo **🧩 Laboratorio JSON**, usa los ejemplos ya validados para comprobar la conexión a AWS sin la variabilidad del modelo.
+
+## Anexo D — Errores detectados durante la construcción
+
+| Situación | Causa | Resolución implementada |
+|---|---|---|
+| \`KPI cannot have a grouping dimension\` | Bedrock propuso un KPI desglosado por segmento/ciudad | Rechazo y **un reintento** de planificación con feedback; si sigue inválido no se ejecuta |
+| \`Bedrock did not return valid evidence identifiers\` | El selector de insights eligió IDs inexistentes o formato incorrecto | Mostrar advertencia y hechos deterministas verificados; datos Athena permanecen válidos |
+| \`0.36\` en margen porcentual | Ratio mostrado sin formato | Renderer presenta \`margin_pct\` como **36 % aprox.** si la fórmula aprobada produce fracción 0–1 |
+| Python 3.9 no instala \`boto3\` requerido | Versión incompatible | Usar entorno Python 3.11 |
+| \`Unapproved metric\` | Medida ausente o no aprobada | Corregir el plan o completar la revisión semántica, **sin inventar fórmulas** |
+| No se puede pegar el prompt | Campo limitado a **1500 caracteres** | Resumir la solicitud; los cuatro prompts de \`config/dashboard_scenarios.json\` ya caben |
+
+Las cuatro Golden Queries de \`config/reference_queries.json\` verifican ventas, pedidos, ticket promedio y margen. El script \`scripts/05_validate_reference.py\` prueba **el antiguo NL-to-SQL**, no todo el motor nuevo de dashboards.
+
+## Anexo E — Checklist de reproducibilidad
+
+- [ ] Rama correcta: \`feature/prompt-to-dashboard\`.
+- [ ] Python 3.11 y dependencias instaladas.
+- [ ] AWS CLI y configuración \`eu-west-1\` comprobados.
+- [ ] Vista \`nexa_master.vw_nexa_genbi_sales\` disponible.
+- [ ] Archivo local \`config/settings.json\` preparado sin subirlo al repositorio.
+- [ ] Archivo \`config/semantic_layer.json\` aprobado y disponible.
+- [ ] \`python -m unittest discover -s tests -v\` termina en \`OK\`.
+- [ ] Ejemplo ejecutivo en **Laboratorio JSON** consulta Athena y muestra valores reales.
+- [ ] Prompt ejecutivo produce un dashboard con un único clic.
+- [ ] Escenarios comercial, rentabilidad y clientes cambian los componentes sin editar Python.
+- [ ] Puedo explicar una consulta SQL y contrastarla con una Golden Query.
+- [ ] Se rechaza una métrica \`ebitda\` no aprobada o un campo \`sql\` arbitrario.
+- [ ] Comprendo que los Executive Insights no prueban causalidad.
+
+**Nota docente:** la solución actual es un laboratorio de BI gobernado, **no** una plataforma de producción multiusuario. Requiere controles AWS de permisos, coste, consulta y protección de datos; no tiene filtros globales de fecha ni garantiza completitud de meses.
+
+**Pregunta final:** ¿qué decisiones tomó Bedrock y cuáles fueron gobernadas y demostradas por la Semantic Layer y Athena?
