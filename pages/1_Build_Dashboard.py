@@ -86,11 +86,14 @@ else:
     st.caption("En este modo editas el JSON antes de ejecutar, sin usar Bedrock para planificar.")
 
 with st.expander("🔧 Dashboard Specification JSON (auditoría)", expanded=mode.startswith("🧩")):
-    st.text_area(
-        "Especificación declarativa",
-        key="dashboard_spec_text",
-        height=320,
-    )
+    if mode.startswith("🧩"):
+        st.text_area(
+            "Especificación declarativa editable",
+            key="dashboard_spec_text",
+            height=320,
+        )
+    else:
+        st.code(st.session_state.dashboard_spec_text, language="json")
 
 manual_run = False
 if mode.startswith("🧩"):
