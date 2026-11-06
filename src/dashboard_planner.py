@@ -1,36 +1,38 @@
-"""Bedrock plans declarative dashboard layouts; it never produces SQL or executable Python."""
+"""Bedrock proposes dashboard structure; the application validates and executes it."""
 import json
 
-from src.dashboard_validator import validate_dashboard
+from src.dashboard_validator import available_dimensions, validate_dashboard
 
 
 PLANNER_SYSTEM_PROMPT = """
 Eres un diseñador de dashboards de Business Intelligence para NEXA Retail.
-Tu única función es proponer una especificación DECLARATIVA de dashboard.
-Devuelve ÚNICAMENTE un objeto JSON válido con estas claves:
+Devuelve ÚNICAMENTE un objeto JSON (sin código, SQL, cifras ni explicaciones):
 {
- "title": "titulo de negocio",
+ "title": "título de negocio",
  "components": [
    {"id": "identificador_unico", "type": "kpi|bar|line|table",
-    "metric": "clave_aprobada", "dimension": "clave_aprobada_o_null",
-    "title": "titulo claro", "limit": 20}
+    "metric": "métrica aprobada", "dimension": null,
+    "title": "título claro", "limit": 20}
  ]
 }
-Reglas:
-- Usa EXCLUSIVAMENTE los identificadores de métricas y dimensiones del catálogo.
-- No inventes columnas, métricas, fórmulas, resultados, fechas, filtros ni cifras.
-- No escribas SQL, Python, texto Markdown ni explicaciones fuera del JSON.
-- No más de 8 componentes, al menos 1. No repitas identificadores.
-- Cada KPI tiene dimension: null. Para barras o tablas, usa una dimensión aprobada.
-- Usa line SOLO si el catálogo contiene sale_month o sale_date, con una de esas dimensiones.
-- Si la petición incluye métricas no disponibles, omítelas; no las sustituyas por otras sin sentido.
-- Selecciona componentes diversos, relacionados con la pregunta.
-- Utiliza ids únicos en minúsculas con letras, dígitos o guiones bajos.
+REGLAS:
+- Solo utiliza identificadores exactos del catálogo. Nunca inventes métricas, fórmulas, dimensiones ni cifras.
+- No generes SQL, Python, filtros de fecha ni explicaciones de negocio.
+- Entre 1 y 8 componentes; cada identificador debe ser único y usar minúsculas y guiones bajos.
+- Los KPI deben tener dimension: null. Los gráficos y tablas necesitan una dimensión aprobada.
+- Para EVOLUCIÓN MENSUAL elige dimension: "sale_month" y type: "line" si sale_month está en el catálogo.
+- No uses sale_date para evolución mensual si existe sale_month.
+- Para ventas, elige revenue; para pedidos, orders; para ticket promedio, average_order_value.
+- Para margen monetario, margin; para margen porcentual, margin_pct, si el catálogo los aprueba.
+- Para categorías y canales usa category y sales_channel respectivamente, si están disponibles.
+- Omite métricas no autorizadas; nunca sustituyas una métrica ausente por otra incongruente.
+- Diseña el dashboard para responder específicamente a la petición del usuario.
 """
 
 
 def catalog_for_planner(semantic):
-    """Expose names and human labels, not SQL expressions or private configurations."""
+    """Expose approved business identifiers and labels, but not SQL expressions."""
+    dimensions = available_dimensions(semantic)
     return {
         "dataset": semantic.get("dataset", "Business Intelligence"),
         "grain": semantic.get("grain", ""),
@@ -44,7 +46,7 @@ def catalog_for_planner(semantic):
         },
         "dimensions": {
             key: {"label": value.get("label", key)}
-            for key, value in semantic.get("dimensions", {}).items()
+            for key, value in dimensions.items()
             if isinstance(value, dict) and value.get("column")
         },
     }
@@ -57,16 +59,15 @@ def plan_dashboard(bedrock_client, user_request, semantic):
     if not catalog["metrics"]:
         raise ValueError("No hay métricas aprobadas disponibles.")
     request = (
-        "CATÁLOGO SEMÁNTICO APROBADO (los identificadores son obligatorios):\n"
+        "CATÁLOGO SEMÁNTICO APROBADO (identificadores obligatorios):\n"
         + json.dumps(catalog, ensure_ascii=False, indent=2)
-        + "\n\nPETICIÓN DEL USUARIO:\n"
+        + "\n\nPETICIÓN DE NEGOCIO:\n"
         + user_request.strip()
-        + "\n\nGenera un Dashboard Specification JSON ajustado a este catálogo."
+        + "\n\nGenera el Dashboard Specification JSON."
     )
     proposed = bedrock_client.ask_json(
         system_prompt=PLANNER_SYSTEM_PROMPT,
         user_prompt=request,
-        max_tokens=2400,
+        max_tokens=2800,
     )
-    # The local semantic validator, not the model, authorizes the proposal.
     return validate_dashboard(proposed, semantic, max_components=8)
