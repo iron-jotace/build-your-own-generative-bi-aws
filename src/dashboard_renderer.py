@@ -9,7 +9,9 @@ def _format_value(value, metric, semantic):
         return "Sin datos"
     context = semantic.get("business_context", {})
     currency = context.get("currency_symbol", "")
-    if metric in {"revenue", "margin", "cost_amount", "average_order_value"}:
+    if metric == "margin_pct":
+        return f"{float(value) * 100:,.2f}%"
+    if metric in {"revenue", "margin", "cost", "gross_sales", "cost_amount", "average_order_value"}:
         return f"{currency}{float(value):,.2f}"
     if metric in {"orders", "units_sold", "customers"}:
         return f"{float(value):,.0f}"
