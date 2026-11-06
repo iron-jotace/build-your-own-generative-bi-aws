@@ -63,5 +63,28 @@ class InsightTests(unittest.TestCase):
         evidence = evidence_from_results(rows, SEMANTIC)
         self.assertNotIn("%", evidence[1]["fact"])
 
+
+    def test_margin_ratio_is_presented_as_percentage(self):
+        evidence = evidence_from_results([
+            entry("margin_pct", "margin_pct", "kpi", [{"metric_value": 0.35925}])
+        ], SEMANTIC)
+        self.assertIn("35.93%", evidence[0]["fact"])
+        self.assertNotIn("(ratio)", evidence[0]["fact"])
+
+    def test_executive_summary_includes_breakdown(self):
+        evidence = evidence_from_results([
+            entry("ventas", "revenue", "kpi", [{"metric_value": 100}]),
+            entry("pedidos", "orders", "kpi", [{"metric_value": 10}]),
+            entry("margen", "margin", "kpi", [{"metric_value": 30}]),
+            entry("coste", "cost", "kpi", [{"metric_value": 70}]),
+            entry("category", "revenue", "bar", [
+                {"dimension_value": "Fashion", "metric_value": 60},
+                {"dimension_value": "Sports", "metric_value": 40},
+            ], "category"),
+        ], SEMANTIC)
+        chosen = curate_insights(FakeModel(["ventas", "pedidos", "margen", "coste"]), "Rentabilidad", evidence)
+        self.assertEqual(len(chosen), 4)
+        self.assertEqual(chosen[-1]["id"], "category")
+
 if __name__ == "__main__":
     unittest.main()
