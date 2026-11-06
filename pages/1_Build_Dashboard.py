@@ -1,116 +1,169 @@
-"""NEXA Retail — governed Prompt-to-Dashboard and editable JSON lab."""
+"""NEXA Retail — one-prompt governed dashboards, with an auditable manual mode."""
 import json
+
 import streamlit as st
 
 from src.athena import AthenaClient
 from src.bedrock import BedrockClient
 from src.config import load_json, load_settings
+from src.dashboard_insights import curate_insights, evidence_from_results
 from src.dashboard_planner import plan_dashboard
-from src.dashboard_runtime import execute_dashboard
 from src.dashboard_renderer import render_dashboard
+from src.dashboard_runtime import execute_dashboard
 from src.dashboard_validator import validate_dashboard
-from src.dashboard_insights import evidence_from_results, curate_insights
 
-st.set_page_config(page_title="NEXA | Build Dashboard", page_icon="📈", layout="wide")
-st.title("📈 NEXA Retail — Build Dashboard")
-st.caption("Prompt → Bedrock Planner → JSON → Semantic Layer → SQL Guard → Athena → Plotly")
+st.set_page_config(page_title="NEXA | Prompt-to-Dashboard", page_icon="📊", layout="wide")
+st.markdown(
+    """
+    <style>
+      .block-container {padding-top: 1.6rem; max-width: 1500px;}
+      div[data-testid="stMetric"] {background: #f8f9fb; border: 1px solid #e7eaf0;
+        border-top: 3px solid #c82f42; border-radius: 12px; padding: 15px;}
+      div[data-testid="stMetricLabel"] {font-weight: 600;}
+      div[data-testid="stMetricValue"] {font-weight: 700;}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+st.title("📊 NEXA Retail | Generative BI")
+st.caption("Prompt-to-Dashboard · Amazon Bedrock · Semantic Layer · Amazon Athena · Streamlit/Plotly")
 
 try:
     settings = load_settings()
     semantic = load_json("config/semantic_layer.json")
-    default_spec = load_json("config/dashboard_examples.json")
-    executive_spec = load_json("config/dashboard_executive.json")
+    commercial_example = load_json("config/dashboard_examples.json")
+    executive_example = load_json("config/dashboard_executive.json")
 except Exception as exc:
     st.error(f"Error de configuración: {exc}")
     st.stop()
 
 if "dashboard_spec_text" not in st.session_state:
-    st.session_state.dashboard_spec_text = json.dumps(default_spec, indent=2, ensure_ascii=False)
+    st.session_state.dashboard_spec_text = json.dumps(executive_example, indent=2, ensure_ascii=False)
+if "dashboard_output" not in st.session_state:
+    st.session_state.dashboard_output = None
 
-mode = st.radio("Modo de construcción", ["✨ Prompt-to-Dashboard (Bedrock)", "🧩 JSON manual"], horizontal=True)
-details = st.checkbox("Mostrar SQL y metadatos Athena", value=False)
-include_insights = st.checkbox("Executive Insights (selección con Bedrock)", value=True)
-preset = st.selectbox("Ejemplo preparado", ["Comercial (4 componentes)", "Ejecutivo (7 componentes)"])
-if st.button("📋 Cargar ejemplo en JSON"):
-    selected = executive_spec if preset.startswith("Ejecutivo") else default_spec
-    st.session_state.dashboard_spec_text = json.dumps(selected, indent=2, ensure_ascii=False)
-    st.success("Ejemplo cargado. Revisa la especificación y pulsa Construir dashboard.")
+mode = st.radio("Modo", ["✨ Prompt-to-Dashboard", "🧩 Laboratorio JSON"], horizontal=True)
+with st.expander("⚙️ Opciones y trazabilidad", expanded=False):
+    details = st.checkbox("Mostrar SQL y metadatos Athena", value=False)
+    include_insights = st.checkbox("Priorizar hallazgos con Bedrock", value=True)
+    st.caption("El SQL procede solo de expresiones aprobadas; el modelo nunca genera código ejecutable.")
 
+business_prompt = ""
+execute_now = False
+plan_only = False
 if mode.startswith("✨"):
-    prompt = st.text_area(
+    business_prompt = st.text_area(
         "¿Qué dashboard necesita tu negocio?",
-        value="Construye un dashboard ejecutivo de NEXA Retail con ventas, pedidos, ticket promedio, margen, evolución mensual de ventas, ventas por categoría y distribución por canal.",
+        value=("Construye un dashboard ejecutivo de NEXA Retail con ventas totales, "
+               "pedidos, ticket promedio, margen, evolución mensual de ventas, "
+               "ventas por categoría y ventas por canal."),
         height=110,
         max_chars=1500,
     )
-    if st.button("✨ Planificar con Bedrock", type="primary", disabled=not prompt.strip()):
-        try:
-            bedrock = BedrockClient(
-                region=settings["aws_region"],
-                model_id=settings["bedrock_model_id"],
-            )
-            with st.spinner("Bedrock está proponiendo los componentes..."):
-                validated = plan_dashboard(bedrock, prompt, semantic)
-            st.session_state.dashboard_spec_text = json.dumps(validated, indent=2, ensure_ascii=False)
-            st.success("Especificación generada y validada. Revisa el JSON y construye el dashboard.")
-        except Exception as exc:
-            st.error(f"No se pudo planificar un dashboard autorizado: {exc}")
-    st.caption("Bedrock solo propone componentes. Los cálculos y el SQL provienen de la Semantic Layer aprobada.")
+    left, right = st.columns([2, 3])
+    with left:
+        execute_now = st.button(
+            "✨ Generar dashboard completo",
+            type="primary",
+            use_container_width=True,
+            disabled=not business_prompt.strip(),
+        )
+    with right:
+        plan_only = st.button(
+            "🔍 Solo planificar (sin consultar Athena)",
+            use_container_width=True,
+            disabled=not business_prompt.strip(),
+        )
+else:
+    preset = st.selectbox(
+        "Ejemplo preparado",
+        ["Ejecutivo (7 componentes)", "Comercial (4 componentes)"],
+    )
+    if st.button("📋 Cargar ejemplo"):
+        selected = executive_example if preset.startswith("Ejecutivo") else commercial_example
+        st.session_state.dashboard_spec_text = json.dumps(selected, indent=2, ensure_ascii=False)
+        st.session_state.dashboard_output = None
+    st.caption("En este modo editas el JSON antes de ejecutar, sin usar Bedrock para planificar.")
 
-with st.expander("🔧 Dashboard Specification JSON (auditoría y edición)", expanded=mode.startswith("🧩")):
+with st.expander("🔧 Dashboard Specification JSON (auditoría)", expanded=mode.startswith("🧩")):
     st.text_area(
-        "Especificación",
+        "Especificación declarativa",
         key="dashboard_spec_text",
-        height=310,
-        help="Puedes editar el JSON y volver a construir el dashboard.",
+        height=320,
     )
 
-if st.button("🚀 Construir dashboard", type="primary"):
-    try:
-        proposal = json.loads(st.session_state.dashboard_spec_text)
-        validated = validate_dashboard(proposal, semantic)
-    except (ValueError, TypeError, KeyError) as exc:
-        st.error(f"Especificación rechazada: {exc}")
-        st.stop()
+manual_run = False
+if mode.startswith("🧩"):
+    manual_run = st.button("🚀 Construir desde JSON", type="primary")
 
-    athena = AthenaClient(
-        region=settings["aws_region"],
-        database=settings["athena_database"],
-        output_s3=settings["athena_output_s3"],
-        workgroup=settings.get("athena_workgroup", "primary"),
-    )
+if execute_now or plan_only or manual_run:
     try:
-        with st.spinner("Consultando Athena y construyendo dashboard..."):
-            final_spec, results = execute_dashboard(validated, semantic, athena)
+        if execute_now or plan_only:
+            with st.spinner("Bedrock está planificando el dashboard..."):
+                bedrock = BedrockClient(
+                    region=settings["aws_region"],
+                    model_id=settings["bedrock_model_id"],
+                )
+                proposed = plan_dashboard(bedrock, business_prompt, semantic)
+            # Save the fully validated, auditable plan for later JSON-mode edits.
+            st.session_state.dashboard_spec_text = json.dumps(proposed, indent=2, ensure_ascii=False)
+            plan = proposed
+        else:
+            plan = validate_dashboard(json.loads(st.session_state.dashboard_spec_text), semantic)
+
+        if plan_only:
+            st.session_state.dashboard_output = None
+            st.success("Plan validado. Abre el JSON para inspeccionarlo; cambia al laboratorio para ejecutarlo.")
+        else:
+            athena = AthenaClient(
+                region=settings["aws_region"],
+                database=settings["athena_database"],
+                output_s3=settings["athena_output_s3"],
+                workgroup=settings.get("athena_workgroup", "primary"),
+            )
+            with st.spinner("Ejecutando consultas gobernadas en Athena..."):
+                final_spec, results = execute_dashboard(plan, semantic, athena)
+
+            evidence = evidence_from_results(results, semantic)
+            selected = evidence[:4]
+            warning = None
+            if include_insights and evidence:
+                try:
+                    with st.spinner("Seleccionando hechos ejecutivos con Bedrock..."):
+                        if not (execute_now or plan_only):
+                            bedrock = BedrockClient(
+                                region=settings["aws_region"],
+                                model_id=settings["bedrock_model_id"],
+                            )
+                        selected = curate_insights(
+                            bedrock,
+                            business_prompt if execute_now else final_spec["title"],
+                            evidence,
+                        )
+                except Exception as exc:
+                    warning = f"Selección con Bedrock no disponible; se usan hechos verificados: {exc}"
+            st.session_state.dashboard_output = {
+                "spec": final_spec,
+                "results": results,
+                "insights": selected,
+                "warning": warning,
+            }
     except Exception as exc:
-        st.error(f"Dashboard bloqueado antes de ejecutarse: {exc}")
-        st.stop()
+        st.session_state.dashboard_output = None
+        st.error(f"No se pudo generar un dashboard gobernado: {exc}")
 
-    render_dashboard(final_spec, results, semantic, show_details=details)
-
-    evidence = evidence_from_results(results, semantic)
-    if evidence:
+output = st.session_state.dashboard_output
+if output:
+    st.divider()
+    render_dashboard(output["spec"], output["results"], semantic, show_details=details)
+    if output["insights"]:
         st.divider()
         st.subheader("💡 Executive Insights")
-        st.caption("Datos calculados en Athena; Bedrock solo prioriza hechos verificados.")
-        selected = evidence[:4]
-        if include_insights:
-            try:
-                with st.spinner("Seleccionando hallazgos verificados..."):
-                    client = BedrockClient(
-                        region=settings["aws_region"],
-                        model_id=settings["bedrock_model_id"],
-                    )
-                    selected = curate_insights(
-                        client,
-                        prompt if mode.startswith("✨") else final_spec["title"],
-                        evidence,
-                    )
-            except Exception as exc:
-                st.warning(f"Bedrock no pudo priorizar los hechos; se muestra el resumen determinista: {exc}")
-        for item in selected:
+        st.caption("Hechos calculados en Athena y seleccionados por evidencia, no cifras generadas por IA.")
+        if output["warning"]:
+            st.warning(output["warning"])
+        for item in output["insights"]:
             st.markdown(f"- **{item['title']}** — {item['fact']}")
-        st.caption("Los resultados no demuestran causalidad; verifica la cobertura temporal de los datos.")
-
-    if any(item["error"] for item in results):
-        st.warning("Dashboard parcial: algunas consultas no pudieron ejecutarse.")
+        st.caption("No se infieren causas. La completitud temporal no se ha verificado.")
+    if any(item["error"] for item in output["results"]):
+        st.warning("Dashboard parcial: algunos componentes no pudieron ejecutarse.")
