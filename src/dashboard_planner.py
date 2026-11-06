@@ -1,7 +1,7 @@
 """Bedrock proposes dashboard structure; the application validates and executes it."""
 import json
 
-from src.dashboard_validator import available_dimensions, validate_dashboard
+from src.dashboard_validator import DashboardValidationError, available_dimensions, validate_dashboard
 
 
 PLANNER_SYSTEM_PROMPT = """
@@ -85,10 +85,24 @@ def plan_dashboard(bedrock_client, user_request, semantic):
         + user_request.strip()
         + "\n\nGenera el Dashboard Specification JSON."
     )
-    proposed = bedrock_client.ask_json(
-        system_prompt=PLANNER_SYSTEM_PROMPT,
-        user_prompt=request,
-        max_tokens=2800,
-    )
-    validated = validate_dashboard(proposed, semantic, max_components=8)
-    return remove_redundant_components(validated)
+    # One validation-guided retry: never execute or silently fix invalid plans.
+    # Bedrock must generate a new fully valid specification.
+    for attempt in range(2):
+        proposed = bedrock_client.ask_json(
+            system_prompt=PLANNER_SYSTEM_PROMPT,
+            user_prompt=request,
+            max_tokens=2800,
+        )
+        try:
+            validated = validate_dashboard(proposed, semantic, max_components=8)
+            return remove_redundant_components(validated)
+        except DashboardValidationError as exc:
+            if attempt == 1:
+                raise
+            request += (
+                "\n\nTU PROPUESTA ANTERIOR FUE RECHAZADA: " + str(exc)
+                + "\nGenera un NUEVO JSON completo y válido. "
+                + "Para KPI usa dimension:null; los desgloses por segmento "
+                + "o ciudad deben ser type:bar o type:table. "
+                + "Mantén todas las métricas y dimensiones dentro del catálogo."
+            )
