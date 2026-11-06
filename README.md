@@ -1,5 +1,9 @@
 # NEXA Retail — Build Your Own Generative BI
 
+> **Última clase — Prompt-to-Dashboard:** la evolución del hands-on hacia dashboards dinámicos gobernados está documentada en [README_PROMPT_TO_DASHBOARD.md](README_PROMPT_TO_DASHBOARD.md). Incluye los cuatro escenarios ejecutivos y el paso a paso en AWS eu-west-1. Se desarrolla en la rama `feature/prompt-to-dashboard`.
+
+---
+
 Hands-on del curso de **Business Intelligence — Ingeniería de Computación y Sistemas, USMP**.
 
 ---
