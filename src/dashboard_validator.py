@@ -1,4 +1,4 @@
-"""Validate a declarative dashboard against an approved semantic catalog."""
+"""Validate dashboard plans against the human-approved semantic layer."""
 import re
 
 ALLOWED_TYPES = {"kpi", "bar", "line", "table"}
@@ -9,8 +9,21 @@ class DashboardValidationError(ValueError):
     pass
 
 
+def available_dimensions(semantic):
+    """Expose sale_month only as a derived grain of an approved sale_date."""
+    dimensions = dict(semantic.get("dimensions", {}))
+    sale_date = dimensions.get("sale_date")
+    if isinstance(sale_date, dict) and sale_date.get("column"):
+        dimensions["sale_month"] = {
+            "label": "Mes de venta (derivado de sale_date)",
+            "column": sale_date["column"],
+            "derived": "month",
+        }
+    return dimensions
+
+
 def validate_dashboard(spec, semantic, max_components=12):
-    """Fail closed: unknown keys, unsupported metrics/dimensions and layouts are rejected."""
+    """Fail closed for unknown keys, metrics, dimensions and chart combinations."""
     if not isinstance(spec, dict):
         raise DashboardValidationError("Dashboard must be a JSON object.")
     if set(spec) - {"title", "components", "version"}:
@@ -19,9 +32,9 @@ def validate_dashboard(spec, semantic, max_components=12):
         raise DashboardValidationError("Title must contain 1-120 characters.")
     components = spec.get("components")
     if not isinstance(components, list) or not 1 <= len(components) <= max_components:
-        raise DashboardValidationError("Dashboard requires 1-12 components.")
+        raise DashboardValidationError(f"Dashboard requires 1-{max_components} components.")
     measures = semantic.get("measures", {})
-    dimensions = semantic.get("dimensions", {})
+    dimensions = available_dimensions(semantic)
     validated = []
     ids = set()
     for i, c in enumerate(components):
@@ -44,11 +57,14 @@ def validate_dashboard(spec, semantic, max_components=12):
             raise DashboardValidationError(f"Unapproved dimension: {dimension}")
         if kind == "line" and dimension not in {"sale_date", "sale_month"}:
             raise DashboardValidationError("Line charts require an approved time dimension.")
-        limit = c.get("limit", 20)
+        limit = c.get("limit", 100 if kind == "line" else 20)
         if type(limit) is not int or not 1 <= limit <= 100:
             raise DashboardValidationError("Component limit must be an integer between 1 and 100.")
         label = c.get("title", metric)
         if not isinstance(label, str) or not 1 <= len(label) <= 120:
             raise DashboardValidationError("Invalid component title.")
-        validated.append({"id": key, "type": kind, "metric": metric, "dimension": dimension, "limit": limit, "title": label})
+        validated.append({
+            "id": key, "type": kind, "metric": metric, "dimension": dimension,
+            "limit": limit, "title": label,
+        })
     return {"version": "1.0", "title": spec["title"], "components": validated}
