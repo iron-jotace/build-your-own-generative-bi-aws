@@ -37,15 +37,31 @@ def render_component(result, semantic, show_details=False):
             "metric_value": component["metric"],
         }), hide_index=True, use_container_width=True)
     elif kind == "bar":
-        fig = px.bar(df, x="dimension_value", y="metric_value",
-                     labels={"dimension_value": component["dimension"],
-                             "metric_value": component["metric"]})
+        chart_df = df.sort_values("metric_value", ascending=True)
+        fig = px.bar(
+            chart_df, x="metric_value", y="dimension_value", orientation="h",
+            labels={"dimension_value": component["dimension"],
+                    "metric_value": component["metric"]},
+        )
+        fig.update_traces(marker_color="#c92e43", hovertemplate="%{y}: %{x:,.2f}<extra></extra>")
+        fig.update_layout(
+            height=max(300, min(560, 55 * len(chart_df) + 100)),
+            margin=dict(l=5, r=15, t=20, b=25),
+            showlegend=False, yaxis_title=None, xaxis_title=component["metric"],
+        )
         st.plotly_chart(fig, use_container_width=True, key=component["id"])
     elif kind == "line":
         chart_df = df.sort_values("dimension_value")
-        fig = px.line(chart_df, x="dimension_value", y="metric_value",
-                      markers=True, labels={"dimension_value": component["dimension"],
-                                            "metric_value": component["metric"]})
+        fig = px.line(
+            chart_df, x="dimension_value", y="metric_value",
+            markers=True, labels={"dimension_value": component["dimension"],
+                                  "metric_value": component["metric"]},
+        )
+        fig.update_traces(line_color="#c92e43", marker_color="#c92e43")
+        fig.update_layout(
+            height=350, margin=dict(l=5, r=15, t=20, b=25),
+            xaxis_title=None, yaxis_title=component["metric"],
+        )
         st.plotly_chart(fig, use_container_width=True, key=component["id"])
     if show_details:
         with st.expander(f"SQL y metadatos: {component['id']}"):
