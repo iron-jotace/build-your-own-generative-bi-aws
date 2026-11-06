@@ -18,6 +18,7 @@ try:
     settings = load_settings()
     semantic = load_json("config/semantic_layer.json")
     default_spec = load_json("config/dashboard_examples.json")
+    executive_spec = load_json("config/dashboard_executive.json")
 except Exception as exc:
     st.error(f"Error de configuración: {exc}")
     st.stop()
@@ -27,11 +28,16 @@ if "dashboard_spec_text" not in st.session_state:
 
 mode = st.radio("Modo de construcción", ["✨ Prompt-to-Dashboard (Bedrock)", "🧩 JSON manual"], horizontal=True)
 details = st.checkbox("Mostrar SQL y metadatos Athena", value=False)
+preset = st.selectbox("Ejemplo preparado", ["Comercial (4 componentes)", "Ejecutivo (7 componentes)"])
+if st.button("📋 Cargar ejemplo en JSON"):
+    selected = executive_spec if preset.startswith("Ejecutivo") else default_spec
+    st.session_state.dashboard_spec_text = json.dumps(selected, indent=2, ensure_ascii=False)
+    st.success("Ejemplo cargado. Revisa la especificación y pulsa Construir dashboard.")
 
 if mode.startswith("✨"):
     prompt = st.text_area(
         "¿Qué dashboard necesita tu negocio?",
-        value="Construye un dashboard ejecutivo de NEXA Retail con ventas, pedidos, ticket promedio, ventas por categoría y distribución por canal.",
+        value="Construye un dashboard ejecutivo de NEXA Retail con ventas, pedidos, ticket promedio, margen, evolución mensual de ventas, ventas por categoría y distribución por canal.",
         height=110,
         max_chars=1500,
     )
