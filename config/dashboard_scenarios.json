@@ -1,0 +1,67 @@
+{
+  "version": "1.0",
+  "notes": "Prompts bajo 1500 caracteres. La selección final de componentes la determina Bedrock y la Semantic Layer aprobada.",
+  "scenarios": [
+    {
+      "id": "executive",
+      "title": "Dirección ejecutiva",
+      "prompt": "Construye un dashboard ejecutivo de NEXA Retail para dirección. Prioriza ventas totales, pedidos únicos, ticket promedio y margen total. Añade evolución mensual de ventas, comparativa por categoría y ventas por canal. Incluye insights basados en los resultados de Athena. Evita duplicar la misma métrica y dimensión. No infieras causas ni inventes resultados.",
+      "focus_metrics": [
+        "revenue",
+        "orders",
+        "average_order_value",
+        "margin"
+      ],
+      "focus_dimensions": [
+        "sale_month",
+        "category",
+        "sales_channel"
+      ]
+    },
+    {
+      "id": "commercial",
+      "title": "Desempeño comercial",
+      "prompt": "Construye un dashboard comercial de NEXA Retail centrado en ingresos y unidades vendidas. Compara ventas por categoría, marca y canal, y añade evolución mensual. Incluye los KPI necesarios sin repetir gráficos de la misma métrica y dimensión. Destaca las categorías y canales líderes usando únicamente hechos de Athena. No inventes cifras ni razones del desempeño.",
+      "focus_metrics": [
+        "revenue",
+        "units_sold",
+        "orders"
+      ],
+      "focus_dimensions": [
+        "category",
+        "brand",
+        "sales_channel",
+        "sale_month"
+      ]
+    },
+    {
+      "id": "profitability",
+      "title": "Rentabilidad",
+      "prompt": "Construye un dashboard de rentabilidad para NEXA Retail. Prioriza ingresos, coste, margen monetario y porcentaje de margen. Compara rentabilidad por categoría y canal. Distingue claramente ingresos de margen y muestra dónde se concentra el resultado. Usa solo métricas aprobadas; no inventes EBITDA ni atribuyas causas a las diferencias.",
+      "focus_metrics": [
+        "revenue",
+        "cost",
+        "margin",
+        "margin_pct"
+      ],
+      "focus_dimensions": [
+        "category",
+        "sales_channel"
+      ]
+    },
+    {
+      "id": "customers",
+      "title": "Clientes",
+      "prompt": "Construye un dashboard de clientes de NEXA Retail. Analiza ingresos y pedidos por segmento de cliente y por ciudad, junto con KPI generales de ventas y ticket promedio. Selecciona gráficos o tablas según los resultados. No confundas pedidos con clientes únicos, y no calcules churn, retención ni lifetime value si no están aprobados en la Semantic Layer. Destaca hallazgos sustentados en Athena.",
+      "focus_metrics": [
+        "revenue",
+        "orders",
+        "average_order_value"
+      ],
+      "focus_dimensions": [
+        "customer_segment",
+        "customer_city"
+      ]
+    }
+  ]
+}
