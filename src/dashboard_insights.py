@@ -30,6 +30,20 @@ def _amount(value, metric, semantic):
 def evidence_from_results(results, semantic):
     """Only use actual queried DataFrames; skip failed, empty and null results."""
     evidence = []
+    # A segment share is reported only when its complete group sum reconciles
+    # with the corresponding unfiltered KPI in the same dashboard.
+    totals = {}
+    for item in results:
+        if item.get("error"):
+            continue
+        frame = item.get("data")
+        if frame is None or frame.empty or "metric_value" not in frame:
+            continue
+        component = item["component"]
+        if component["type"] == "kpi":
+            value = _number(frame.iloc[0]["metric_value"])
+            if value is not None:
+                totals[component["metric"]] = value
     for result in results:
         if result.get("error") or result.get("data") is None:
             continue
@@ -67,11 +81,18 @@ def evidence_from_results(results, semantic):
             )
         else:
             top = valid.loc[valid["metric_value"].idxmax()]
+            top_value = float(top["metric_value"])
             fact = (
-                f"En {component['title'].lower()}, el segmento con mayor valor "
-                f"observado es {top['dimension_value']}: "
-                f"{_amount(float(top['metric_value']), metric, semantic)}."
+                f"Lidera {component['title'].lower()}: {top['dimension_value']} "
+                f"con {_amount(top_value, metric, semantic)}."
             )
+            # Only show percent of whole if every observed group reconciles
+            # with the KPI. A LIMIT or missing group can invalidate the share.
+            total = totals.get(metric)
+            group_sum = float(valid["metric_value"].sum())
+            if (total is not None and total > 0
+                    and math.isclose(group_sum, total, rel_tol=0.00001, abs_tol=0.02)):
+                fact += f" Representa el {100 * top_value / total:.1f}% del total validado."
         evidence.append({
             "id": component["id"], "title": component["title"],
             "fact": fact, "source": component["id"],
@@ -84,7 +105,7 @@ Recibes hechos de Athena con identificadores y debes seleccionar hasta 4 hechos 
 para un resumen ejecutivo. Devuelve SOLO JSON: {"selected_ids":["id1","id2"]}.
 Elige exclusivamente IDs presentes, sin inventarlos ni escribir resultados, números,
 comentarios adicionales, causas, predicciones o métricas.
-Prioriza hechos diversos y relevantes; no repitas IDs.
+Prioriza diversidad: al menos un desglose dimensional o temporal si existe. Evita seleccionar solamente KPIs que repitan las tarjetas visibles. No repitas IDs.
 """
 
 
