@@ -54,5 +54,33 @@ class PlannerTests(unittest.TestCase):
             plan_dashboard(model, "Quiero un dashboard financiero", SEMANTIC)
 
 
+
+    def test_retry_kpi_with_invalid_dimension(self):
+        class FirstInvalidThenValid:
+            def __init__(self):
+                self.calls = []
+            def ask_json(self, system_prompt, user_prompt, max_tokens):
+                self.calls.append(user_prompt)
+                if len(self.calls) == 1:
+                    return {"title": "Clientes", "components": [
+                        {"id": "segment_sales", "type": "kpi", "metric": "revenue",
+                         "dimension": "category"}]}
+                return {"title": "Clientes", "components": [
+                    {"id": "segment_sales", "type": "bar", "metric": "revenue",
+                     "dimension": "category"}]}
+        model = FirstInvalidThenValid()
+        plan = plan_dashboard(model, "Analiza ingresos por segmentos", SEMANTIC)
+        self.assertEqual(plan["components"][0]["type"], "bar")
+        self.assertEqual(len(model.calls), 2)
+        self.assertIn("KPI cannot have a grouping dimension", model.calls[1])
+
+    def test_retry_still_rejects_second_invalid_plan(self):
+        model = FakeBedrock({"title": "Clientes", "components": [
+            {"id": "bad", "type": "kpi", "metric": "revenue",
+             "dimension": "category"}]})
+        with self.assertRaises(DashboardValidationError):
+            plan_dashboard(model, "Analiza ingresos por segmentos", SEMANTIC)
+        self.assertEqual(len(model.calls), 2)
+
 if __name__ == "__main__":
     unittest.main()
